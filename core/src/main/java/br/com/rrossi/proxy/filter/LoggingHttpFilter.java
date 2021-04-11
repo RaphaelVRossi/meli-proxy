@@ -1,16 +1,20 @@
 package br.com.rrossi.proxy.filter;
 
-import br.com.rrossi.proxy.exception.ProxyException;
-import io.netty.handler.proxy.ProxyConnectException;
+import br.com.rrossi.proxy.client.ApiClient;
+import br.com.rrossi.proxy.model.ApiStatisticModel;
+import br.com.rrossi.proxy.util.ApiUtils;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.opentracing.Traced;
 import org.slf4j.MDC;
 
 import javax.annotation.Priority;
 import javax.enterprise.context.SessionScoped;
+import javax.inject.Inject;
+import javax.json.bind.JsonbBuilder;
 import javax.ws.rs.Priorities;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -23,6 +27,9 @@ import javax.ws.rs.ext.Provider;
 import javax.ws.rs.ext.WriterInterceptor;
 import javax.ws.rs.ext.WriterInterceptorContext;
 import java.io.*;
+import java.net.URI;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -35,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 @SessionScoped
 public class LoggingHttpFilter implements ContainerRequestFilter, ContainerResponseFilter, Serializable, WriterInterceptor {
     private static final String INITIAL_TIME = "initialTime";
+    private static final String FINISH_TIME = "finishTime";
     private static final String METHOD = "x-method";
     private static final String PATH = "x-path";
 
@@ -51,12 +59,21 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
     @Context
     HttpServerResponse response;
 
+    @Inject
+    ApiClient apiClient;
+
+    @ConfigProperty(name = "proxy.http.statistic.enable", defaultValue = "true")
+    boolean statisticEnable;
+
+    @ConfigProperty(name = "proxy.http.statistic.url", defaultValue = "http://statistic-analyzer:8080/api-info")
+    String statisticUrl;
+
     @Override
     @Traced
     public void filter(ContainerRequestContext containerRequestContext) throws IOException {
         MDC.put(INITIAL_TIME, String.valueOf(System.currentTimeMillis()));
         MDC.put(METHOD, containerRequestContext.getMethod());
-        MDC.put(PATH, info.getPath());
+        MDC.put(PATH, ApiUtils.getBasePath(info));
 
         String requestBody = null;
 
@@ -74,7 +91,7 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
             log.info("{}", body);
         }
 
-        log.info("{} {} | {} | {} | {} | {} | Request received", request.method(), info.getPath(), requestBody, request.params().names(),
+        log.info("{} {} | {} | {} | {} | {} | Request received", request.method(), ApiUtils.getBasePath(info), requestBody, request.params().names(),
                 request.query(), request.headers().entries());
     }
 
@@ -111,13 +128,47 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
 
     @Override
     public void aroundWriteTo(WriterInterceptorContext writerInterceptorContext) throws IOException, WebApplicationException {
+        MDC.put(FINISH_TIME, String.valueOf(System.currentTimeMillis() - Long.parseLong(MDC.get(INITIAL_TIME))));
+
         final LoggingHttpFilter.LoggingStream stream = (LoggingHttpFilter.LoggingStream) writerInterceptorContext.getProperty(LoggingHttpFilter.ENTITY_LOGGER_PROPERTY);
+
         writerInterceptorContext.proceed();
         String body = "-";
         if (stream != null)
             body = stream.getStringBuilder().toString();
 
-        log.info("{} | {} | {} | Response sended", body, response.headers().names(), System.currentTimeMillis() - Long.parseLong(MDC.get(INITIAL_TIME)));
+        log.info("{} | {} | {} | Response sended", body, response.headers().names(), Long.parseLong(MDC.get(FINISH_TIME)));
+        sendApiStatistics(body);
+    }
+
+    private void sendApiStatistics(String responseBody) {
+        if (!statisticEnable)
+            return;
+
+        ApiStatisticModel model = new ApiStatisticModel();
+
+        model.setBasePath(ApiUtils.getBasePath(info));
+
+        String authToken = request.getHeader("Authorization");
+
+        String appId = ApiUtils.recoverInfoFromAuthToken(authToken, ApiUtils.AuthType.APP_ID);
+        String userId = ApiUtils.recoverInfoFromAuthToken(authToken, ApiUtils.AuthType.USER_ID);
+
+        model.setAppId(appId);
+        model.setUserId(userId);
+        model.setResponseCode(response.getStatusCode());
+        model.setResponseTime(Long.parseLong(MDC.get(FINISH_TIME)));
+        model.setContentLength(responseBody.length());
+
+        String modelJson = JsonbBuilder.create().toJson(model);
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .header("Content-Type", "application/json")
+                .uri(URI.create(statisticUrl))
+                .POST(HttpRequest.BodyPublishers.ofString(modelJson))
+                .build();
+
+        apiClient.sendStatisticAsync(httpRequest, modelJson, HttpResponse.BodyHandlers.ofString());
     }
 
     private class LoggingStream extends FilterOutputStream {

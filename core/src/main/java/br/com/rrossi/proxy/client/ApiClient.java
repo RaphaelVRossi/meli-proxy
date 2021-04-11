@@ -18,10 +18,21 @@ import java.util.concurrent.TimeUnit;
 public abstract class ApiClient {
     abstract HttpClient getHttpClient();
 
-    public <T>  HttpResponse<T>
-    sendAsync(HttpRequest request,
-              HttpResponse.BodyHandler<T> responseBodyHandler) {
-        logRequestClient(request);
+    public <T> void sendStatisticAsync(HttpRequest request, String body, HttpResponse.BodyHandler<T> responseBodyHandler) {
+        logRequestClient(request, body);
+
+        getHttpClient().sendAsync(request, responseBodyHandler)
+                .whenComplete((response, throwable) -> logResponseClient(request, response)).toCompletableFuture()
+                .orTimeout(5000, TimeUnit.MILLISECONDS);
+    }
+
+    public <T> HttpResponse<T> sendAsync(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) {
+        return sendAsync(request,null,responseBodyHandler);
+    }
+
+    public <T> HttpResponse<T> sendAsync(HttpRequest request, String body,
+                                         HttpResponse.BodyHandler<T> responseBodyHandler) {
+        logRequestClient(request, body);
 
         CompletableFuture<HttpResponse<T>> future = new CompletableFuture<>();
 
@@ -40,7 +51,11 @@ public abstract class ApiClient {
 
     public <T> HttpResponse<T>
     send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) {
-        logRequestClient(request);
+        return send(request, null, responseBodyHandler);
+    }
+
+    public <T> HttpResponse<T> send(HttpRequest request, String body, HttpResponse.BodyHandler<T> responseBodyHandler) {
+        logRequestClient(request, body);
 
         HttpResponse<T> response;
         try {
@@ -55,10 +70,10 @@ public abstract class ApiClient {
         return response;
     }
 
-    private void logRequestClient(HttpRequest request) {
+    private void logRequestClient(HttpRequest request, String body) {
         log.info("Call {} {} {}", request.method(), request.uri(), request.headers());
-        if (request.bodyPublisher().isPresent())
-            log.info("Body {}", request.bodyPublisher().get());
+        if (body != null)
+            log.info("Body {}", body);
     }
 
     private void logResponseClient(HttpRequest request, HttpResponse<?> response) {
