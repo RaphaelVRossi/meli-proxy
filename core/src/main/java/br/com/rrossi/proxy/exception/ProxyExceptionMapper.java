@@ -1,4 +1,6 @@
-package br.com.rrossi.proxy.filter;
+package br.com.rrossi.proxy.exception;
+
+import br.com.rrossi.proxy.model.ProxyExceptionModel;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
@@ -11,8 +13,15 @@ import javax.ws.rs.ext.Provider;
 public class ProxyExceptionMapper implements ExceptionMapper<Throwable> {
     @Override
     public Response toResponse(Throwable exception) {
+
+        ProxyExceptionModel model = new ProxyExceptionModel();
+        model.setMessage("Proxy internal error");
+        model.setError("internal_server_error");
+        model.setStatus(500);
+        model.setCause(new String[]{});
+
         return Response.serverError()
-                .entity("{\"message\":\"Proxy internal error\",\"error\":\"internal_server_error\",\"status\":500,\"cause\":[]}")
+                .entity(model)
                 .build();
     }
 }

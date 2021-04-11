@@ -23,7 +23,7 @@ public class ApiUtils {
         if (uriInfo.getPathParameters().isEmpty() || !uriInfo.getPathParameters().containsKey(ApiUtils.API_URI))
             throw new ProxyException();
 
-        String apiUri = uriInfo.getPathParameters().get(ApiUtils.API_URI).get(0);
+        String apiUri = getBasePath(uriInfo);
 
         if (apiUri == null || apiUri.isEmpty())
             throw new ProxyException();
@@ -38,6 +38,10 @@ public class ApiUtils {
         }
 
         return URI.create(BASE_URL + apiUri);
+    }
+
+    public static String getBasePath(UriInfo uriInfo) {
+        return uriInfo.getPathParameters().get(ApiUtils.API_URI).get(0);
     }
 
     public static String[] createRequestHeaders(HttpHeaders requestHeaders) {
@@ -66,5 +70,32 @@ public class ApiUtils {
         return HttpRequest.newBuilder()
                 .headers(ApiUtils.createRequestHeaders(headers))
                 .uri(ApiUtils.getUri(uriInfo));
+    }
+
+    public static String recoverInfoFromAuthToken(String authToken, AuthType type) {
+        if (authToken == null || authToken.isEmpty())
+            return null;
+
+        String[] authTokenSplit = authToken.split("-");
+
+        if (authTokenSplit.length < 5)
+            return null;
+
+        return authTokenSplit[type.getIndex()];
+    }
+
+    public enum AuthType {
+        APP_ID(1),
+        USER_ID(4);
+
+        private final int index;
+
+        AuthType(int index) {
+            this.index = index;
+        }
+
+        public int getIndex() {
+            return index;
+        }
     }
 }
