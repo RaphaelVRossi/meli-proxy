@@ -1,5 +1,7 @@
 package br.com.rrossi.proxy.filter;
 
+import br.com.rrossi.proxy.exception.ProxyException;
+import io.netty.handler.proxy.ProxyConnectException;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import lombok.extern.slf4j.Slf4j;
