@@ -7,6 +7,7 @@ If you want to learn more about Quarkus, please visit its website: https://quark
 If you want to learn more about GraalVM, please visit its website: https://www.graalvm.org/ .
 
 This project uses [Mongodb Client](https://quarkus.io/guides/mongodb)
+This project uses [OpenApi - SwaggerUi](https://quarkus.io/guides/openapi-swaggerui)
 
 ## Running Mongodb Docker
 ```shell
@@ -36,3 +37,8 @@ These properties are used by the `statistic-analyzer`:
 | `responseCode`    | Response code from backend                        | `200`                 | int       
 | `appId`           | AppId from Authentication Header                  | `2489712506316422`    | String    
 | `userId`          | UserId  from Authentication Header                | `683916458`           | String    
+
+## SwaggerUI
+
+Once your application is started, you can make a request to the default /q/openapi endpoint to get schema
+and /q/swagger-ui to access Swageger UI Page

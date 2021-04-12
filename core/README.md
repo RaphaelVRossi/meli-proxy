@@ -6,6 +6,8 @@ If you want to learn more about Quarkus, please visit its website: https://quark
 
 If you want to learn more about GraalVM, please visit its website: https://www.graalvm.org/ .
 
+All api are redirect to [Mercado Livre API](https://developers.mercadolibre.com.ar/pt_br)
+
 This project uses [Redis Client](https://quarkus.io/guides/redis)
 
 ## Running Redis docker
