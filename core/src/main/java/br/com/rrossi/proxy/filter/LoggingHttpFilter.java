@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.opentracing.Traced;
+import org.jboss.resteasy.core.interception.jaxrs.ContainerResponseContextImpl;
+import org.jboss.resteasy.specimpl.BuiltResponse;
 import org.slf4j.MDC;
 
 import javax.annotation.Priority;
@@ -16,7 +18,6 @@ import javax.enterprise.context.SessionScoped;
 import javax.inject.Inject;
 import javax.json.bind.JsonbBuilder;
 import javax.ws.rs.Priorities;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ContainerResponseContext;
@@ -24,9 +25,10 @@ import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.UriInfo;
 import javax.ws.rs.ext.Provider;
-import javax.ws.rs.ext.WriterInterceptor;
-import javax.ws.rs.ext.WriterInterceptorContext;
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Serializable;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -40,15 +42,14 @@ import java.nio.charset.StandardCharsets;
 @Provider
 @Priority(Priorities.USER + 1)
 @SessionScoped
-public class LoggingHttpFilter implements ContainerRequestFilter, ContainerResponseFilter, Serializable, WriterInterceptor {
+public class LoggingHttpFilter implements ContainerRequestFilter, ContainerResponseFilter, Serializable {
     private static final String INITIAL_TIME = "initialTime";
     private static final String FINISH_TIME = "finishTime";
     private static final String METHOD = "x-method";
     private static final String PATH = "x-path";
 
     private static final int DEFAULT_MAX_ENTITY_SIZE = 8 * 1024;
-    private final int maxEntitySize = DEFAULT_MAX_ENTITY_SIZE;
-    private static final String ENTITY_LOGGER_PROPERTY = LoggingHttpFilter.class.getName() + ".entityLogger";
+    private static final int maxEntitySize = DEFAULT_MAX_ENTITY_SIZE;
 
     @Context
     UriInfo info;
@@ -100,13 +101,13 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
         if (MDC.get(INITIAL_TIME) == null)
             MDC.put(INITIAL_TIME, String.valueOf(System.currentTimeMillis()));
 
-        final StringBuilder b = new StringBuilder();
+        BuiltResponse jaxrsResponse = ((ContainerResponseContextImpl) containerResponseContext).getJaxrsResponse();
 
-        if (containerResponseContext.hasEntity()) {
-            final OutputStream stream = new LoggingHttpFilter.LoggingStream(b, containerResponseContext.getEntityStream());
-            containerResponseContext.setEntityStream(stream);
-            containerRequestContext.setProperty(LoggingHttpFilter.ENTITY_LOGGER_PROPERTY, stream);
-        }
+        MDC.put(FINISH_TIME, String.valueOf(System.currentTimeMillis() - Long.parseLong(MDC.get(INITIAL_TIME))));
+
+        log.info("{} | {} | {} | Response sended", jaxrsResponse.getEntity(), response.headers().names(), Long.parseLong(MDC.get(FINISH_TIME)));
+
+        sendApiStatistics(jaxrsResponse.getStatus(), jaxrsResponse.getEntity().toString());
     }
 
     private InputStream logInboundEntity(final StringBuilder b, InputStream stream) throws IOException {
@@ -114,11 +115,11 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
             stream = new BufferedInputStream(stream);
         }
 
-        stream.mark(this.maxEntitySize + 1);
-        final byte[] entity = new byte[this.maxEntitySize + 1];
+        stream.mark(maxEntitySize + 1);
+        final byte[] entity = new byte[maxEntitySize + 1];
         final int entitySize = stream.read(entity);
-        b.append(new String(entity, 0, Math.min(entitySize, this.maxEntitySize), StandardCharsets.UTF_8));
-        if (entitySize > this.maxEntitySize) {
+        b.append(new String(entity, 0, Math.min(entitySize, maxEntitySize), StandardCharsets.UTF_8));
+        if (entitySize > maxEntitySize) {
             b.append("...more...");
         }
         b.append('\n');
@@ -126,22 +127,7 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
         return stream;
     }
 
-    @Override
-    public void aroundWriteTo(WriterInterceptorContext writerInterceptorContext) throws IOException, WebApplicationException {
-        MDC.put(FINISH_TIME, String.valueOf(System.currentTimeMillis() - Long.parseLong(MDC.get(INITIAL_TIME))));
-
-        final LoggingHttpFilter.LoggingStream stream = (LoggingHttpFilter.LoggingStream) writerInterceptorContext.getProperty(LoggingHttpFilter.ENTITY_LOGGER_PROPERTY);
-
-        writerInterceptorContext.proceed();
-        String body = "-";
-        if (stream != null)
-            body = stream.getStringBuilder().toString();
-
-        log.info("{} | {} | {} | Response sended", body, response.headers().names(), Long.parseLong(MDC.get(FINISH_TIME)));
-        sendApiStatistics(body);
-    }
-
-    private void sendApiStatistics(String responseBody) {
+    private void sendApiStatistics(int statusCode, String responseBody) {
         if (!statisticEnable)
             return;
 
@@ -156,7 +142,7 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
 
         model.setAppId(appId);
         model.setUserId(userId);
-        model.setResponseCode(response.getStatusCode());
+        model.setResponseCode(statusCode);
         model.setResponseTime(Long.parseLong(MDC.get(FINISH_TIME)));
         model.setContentLength(responseBody.length());
 
@@ -169,40 +155,5 @@ public class LoggingHttpFilter implements ContainerRequestFilter, ContainerRespo
                 .build();
 
         apiClient.sendStatisticAsync(httpRequest, modelJson, HttpResponse.BodyHandlers.ofString());
-    }
-
-    private class LoggingStream extends FilterOutputStream {
-
-        private final StringBuilder b;
-
-        private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        LoggingStream(final StringBuilder b, final OutputStream inner) {
-
-            super(inner);
-
-            this.b = b;
-        }
-
-        StringBuilder getStringBuilder() {
-            final byte[] entity = this.baos.toByteArray();
-
-            this.b.append(new String(entity, 0, Math.min(entity.length, LoggingHttpFilter.this.maxEntitySize), StandardCharsets.UTF_8));
-            if (entity.length > LoggingHttpFilter.this.maxEntitySize) {
-                this.b.append("...more...");
-            }
-            this.b.append('\n');
-
-            return this.b;
-        }
-
-        @Override
-        public void write(final int i) throws IOException {
-
-            if (this.baos.size() <= LoggingHttpFilter.this.maxEntitySize) {
-                this.baos.write(i);
-            }
-            this.out.write(i);
-        }
     }
 }

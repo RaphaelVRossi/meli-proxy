@@ -38,7 +38,11 @@ public class MercadoLibreApiClient implements MercadoLibreApi {
         HttpResponse<String> httpResponse = this.apiClient
                 .send(request, HttpResponse.BodyHandlers.ofString());
 
-        return Response.status(httpResponse.statusCode()).entity(httpResponse.body()).build();
+        Response.ResponseBuilder header = Response.status(httpResponse.statusCode()).entity(httpResponse.body());
+
+        return ApiUtils.createResponseHeaders(header,
+                httpResponse.headers())
+                .build();
     }
 
     @Override
@@ -50,7 +54,11 @@ public class MercadoLibreApiClient implements MercadoLibreApi {
         HttpResponse<String> httpResponse = this.apiClient
                 .send(request, HttpResponse.BodyHandlers.ofString());
 
-        return Response.status(httpResponse.statusCode()).entity(httpResponse.body()).build();
+        Response.ResponseBuilder header = Response.status(httpResponse.statusCode()).entity(httpResponse.body());
+
+        return ApiUtils.createResponseHeaders(header,
+                httpResponse.headers())
+                .build();
     }
 
     @Override
@@ -62,7 +70,11 @@ public class MercadoLibreApiClient implements MercadoLibreApi {
         HttpResponse<String> httpResponse = this.apiClient
                 .send(request, HttpResponse.BodyHandlers.ofString());
 
-        return Response.status(httpResponse.statusCode()).entity(httpResponse.body()).build();
+        Response.ResponseBuilder header = Response.status(httpResponse.statusCode()).entity(httpResponse.body());
+
+        return ApiUtils.createResponseHeaders(header,
+                httpResponse.headers())
+                .build();
     }
 
     @Override
@@ -74,7 +86,11 @@ public class MercadoLibreApiClient implements MercadoLibreApi {
         HttpResponse<String> httpResponse = this.apiClient
                 .send(request, HttpResponse.BodyHandlers.ofString());
 
-        return Response.status(httpResponse.statusCode()).entity(httpResponse.body()).build();
+        Response.ResponseBuilder header = Response.status(httpResponse.statusCode()).entity(httpResponse.body());
+
+        return ApiUtils.createResponseHeaders(header,
+                httpResponse.headers())
+                .build();
     }
 
     @Override
@@ -86,6 +102,10 @@ public class MercadoLibreApiClient implements MercadoLibreApi {
         HttpResponse<String> httpResponse = this.apiClient
                 .send(request, HttpResponse.BodyHandlers.ofString());
 
-        return Response.status(httpResponse.statusCode()).entity(httpResponse.body()).build();
+        Response.ResponseBuilder header = Response.status(httpResponse.statusCode()).entity(httpResponse.body());
+
+        return ApiUtils.createResponseHeaders(header,
+                httpResponse.headers())
+                .build();
     }
 }

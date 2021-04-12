@@ -3,6 +3,7 @@ package br.com.rrossi.proxy.util;
 import br.com.rrossi.proxy.exception.ProxyException;
 
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -48,7 +49,14 @@ public class ApiUtils {
         List<String> headers = new LinkedList<>();
 
         requestHeaders.getRequestHeaders().entrySet().stream()
+                .filter(stringListEntry -> !"connection".equalsIgnoreCase(stringListEntry.getKey()))
+                .filter(stringListEntry -> !"date".equalsIgnoreCase(stringListEntry.getKey()))
+                .filter(stringListEntry -> !"expect".equalsIgnoreCase(stringListEntry.getKey()))
+                .filter(stringListEntry -> !"from".equalsIgnoreCase(stringListEntry.getKey()))
                 .filter(stringListEntry -> !"host".equalsIgnoreCase(stringListEntry.getKey()))
+                .filter(stringListEntry -> !"via".equalsIgnoreCase(stringListEntry.getKey()))
+                .filter(stringListEntry -> !"warning".equalsIgnoreCase(stringListEntry.getKey()))
+                .filter(stringListEntry -> !"upgrade".equalsIgnoreCase(stringListEntry.getKey()))
                 .filter(stringListEntry -> !"content-length".equalsIgnoreCase(stringListEntry.getKey()))
                 .forEach((entry) -> entry.getValue().forEach(value -> {
                     headers.add(entry.getKey());
@@ -64,6 +72,16 @@ public class ApiUtils {
         }
 
         return headers.toArray(new String[]{});
+    }
+
+    public static Response.ResponseBuilder createResponseHeaders(Response.ResponseBuilder builder,
+                                                                 java.net.http.HttpHeaders httpHeaders) {
+        httpHeaders.map().entrySet().stream()
+                .filter(stringListEntry -> !"host".equalsIgnoreCase(stringListEntry.getKey()))
+                .filter(stringListEntry -> !":status".equalsIgnoreCase(stringListEntry.getKey()))
+                .forEach((entry) -> entry.getValue().forEach(value -> builder.header(entry.getKey(), value)));
+
+        return builder;
     }
 
     public static HttpRequest.Builder createHttpRequestBuilder(UriInfo uriInfo, HttpHeaders headers) {
