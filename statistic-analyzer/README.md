@@ -19,3 +19,20 @@ You can run your application in dev mode that enables live coding using:
 ```shell script
 ./mvnw compile quarkus:dev -P dev
 ```
+
+## Statistic Analyzer
+
+This module is used to analyze all api call thougth the core proxy module.
+
+The core module send a http async call with the following information.
+
+These properties are used by the `statistic-analyzer`:
+
+| Field Named       | Description                                       | Example               | Type    
+|-------------------|---------------------------------------------------|-----------------------|--------|
+| `basePath`        | BasePath of the backend API                       | `oauth/token`         | String    
+| `contentLength`   | Response's body contentLength                     | `167`                 | int       
+| `responseTime`    | Amount of time the core module need to process    | `352`                 | int       
+| `responseCode`    | Response code from backend                        | `200`                 | int       
+| `appId`           | AppId from Authentication Header                  | `2489712506316422`    | String    
+| `userId`          | UserId  from Authentication Header                | `683916458`           | String    
