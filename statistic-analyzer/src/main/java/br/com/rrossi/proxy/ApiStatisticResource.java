@@ -21,7 +21,7 @@ public class ApiStatisticResource {
     ApiStatisticService apiStatisticService;
 
     @GET
-    @Produces(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.APPLICATION_JSON)
     public Response hello(@QueryParam("basePath") String basePath) {
 
         List<ApiStatisticModel> allApiCalls = apiStatisticService.findAllApiCalls(basePath);
@@ -33,7 +33,7 @@ public class ApiStatisticResource {
     }
 
     @GET
-    @Produces(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.APPLICATION_JSON)
     @Path("/consumes")
     public Response consumes() {
 
@@ -46,7 +46,7 @@ public class ApiStatisticResource {
     }
 
     @GET
-    @Produces(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.APPLICATION_JSON)
     @Path("/average")
     public Response average(@QueryParam("basePath") String basePath) {
 
@@ -59,7 +59,7 @@ public class ApiStatisticResource {
     }
 
     @GET
-    @Produces(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.APPLICATION_JSON)
     @Path("/status")
     public Response status(@QueryParam("basePath") String basePath) {
 
@@ -72,7 +72,7 @@ public class ApiStatisticResource {
     }
 
     @POST
-    @Produces(MediaType.TEXT_PLAIN)
+    @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public Response saveApiInfo(ApiStatisticModel model) {
         apiStatisticService.add(toJson.toJson(model));
